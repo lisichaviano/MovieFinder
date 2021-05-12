@@ -1,51 +1,54 @@
 import { useNavigation } from '@react-navigation/native';
-import React, { Reducer, ReducerAction, useReducer, useState } from 'react';
-import { Text, View, Image } from 'react-native';
+import React, { Reducer, ReducerAction, useEffect, useReducer, useState } from 'react';
+import { Text, View, Image, FlatList } from 'react-native';
 import { SearchBar, ListItem } from 'react-native-elements';
-import { movies } from '../../data/movies';
-
-
-// interface MainScreenState {
-//     query: string
-// }
-
-// const mainScreenReducer = (state: MainScreenState, action: {type: string, params: {}}) => {
-//     switch (type) {
-//         case "SET_QUERY":
-//             return { ...state, query: }
-//     }
-// }
+import { API_BASE, getMoviePosterUrl, getPopular, IMAGE_BASE, searchMovies } from '../../api';
 
 const MainScreen: React.FC = () => {
     const navigation = useNavigation();
     const [query, setQuery] = useState('');
+    const [movies, setMovies] = useState([]);
+    
+    useEffect(() => {
+        let result: Promise<any>;
+        if (query) {
+            result = searchMovies(query);
+        } else {
+            result = getPopular();
+        }
+        result.then(setMovies);
+    }, [query]);
 
     return (
         <View>
             <SearchBar 
                 platform="default"
-                placeholder="Busca una pelicula por nombre"
+                placeholder="Find film for name"
                 value={query}
                 onChangeText={(text) => setQuery(text)}
                 lightTheme={true}
                 />
+            
+            <Text style={{marginTop: 16, marginBottom: 8, marginLeft: 16, fontSize: 24}}>
+                {query ? "Results" : "What's popular?"}
+            </Text>     
 
-            <Text style={{marginTop: 16, marginBottom: 8, marginLeft: 16, fontSize: 24}}>What's popular?</Text>
-
-            {
-                movies.map((movie, index) => (
-                    <ListItem key={index} 
-                        onPress={() => {navigation.navigate('Details', movie)}} 
+            <FlatList 
+                data={movies}
+                keyExtractor={item => item.id.toString()}
+                renderItem={({item}) => ( 
+                    <ListItem 
+                        onPress={() => {navigation.navigate('Details', item.id)}} 
                         bottomDivider={true}>
-                        <Image source={movie.poster_path} style={{width: 64, height: 64}}/>
+                        <Image source={{uri: getMoviePosterUrl(item.poster_path)}} style={{width: 64, height: 64}}/>
                         <ListItem.Content>
-                            <ListItem.Title>{ movie.title }</ListItem.Title>
-                            <ListItem.Subtitle numberOfLines={2} ellipsizeMode="tail">{ movie.overview }</ListItem.Subtitle>
+                            <ListItem.Title>{ item.title }</ListItem.Title>
+                            <ListItem.Subtitle numberOfLines={2} ellipsizeMode="tail">{ item.overview }</ListItem.Subtitle>
                         </ListItem.Content>
                         <ListItem.Chevron />
                     </ListItem>
-                ))
-            }
+                )}
+                />
         </View>
     )
 } 

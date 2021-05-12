@@ -1,8 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
-import React, { Reducer, ReducerAction, useReducer, useState } from 'react';
+import React, { Reducer, ReducerAction, useEffect, useReducer, useState } from 'react';
 import { Button, Image, Modal, ModalProps, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { AirbnbRating, BottomSheet, Icon } from 'react-native-elements';
-import { IMovieInfo } from '../../data/movies'
+import { getMovieDetails, getMoviePosterUrl, getOpinion, IOpinion, saveOpinion } from '../../api';
 
 interface IReviewModalProps {
     visible: boolean;
@@ -50,25 +50,31 @@ const ReviewModal: React.FC<IReviewModalProps> = ({visible, onReviewCompleted}) 
 
 const DetailsScreen: React.FC = ({route}) => {
     const {width, height} = useWindowDimensions();
-    const navigation = useNavigation();
-    const movie = route.params as IMovieInfo;
+    const movieId = route.params as string;
+
+    const [movie, setMovie] = useState({});
+    const [opinion, setOpinion] = useState<IOpinion>({rating: undefined, review: undefined});
     const [modalVisible, setModalVisible] = useState(false);
 
     const reviewCompleted = (success: boolean, rating: number, review: string) => {
         if (success) {
-            movie.rating = rating; 
-            movie.review = review;
+            saveOpinion(movieId, {rating, review});
+            setOpinion({rating, review});
         }
-
         setModalVisible(false);
     }
+
+    useEffect(() => {
+        getMovieDetails(movieId).then(setMovie);
+        getOpinion(movieId).then(setOpinion);
+    }, [movieId]);
 
     const RatingComp = () => (
         <View style={{flexDirection: 'row', marginTop: 16}}>
             <AirbnbRating 
                 showRating={false}
                 count={5}
-                defaultRating={movie.rating}
+                defaultRating={opinion.rating}
                 size={24}
                 isDisabled={true}/>
         </View>
@@ -79,23 +85,33 @@ const DetailsScreen: React.FC = ({route}) => {
             multiline={true} 
             numberOfLines={5}
             editable={false}
-            value={movie.review} />
+            value={opinion.review} />
     );
-    
+
+    console.log(movie);
+
     return (
         <View style={styles.container}>
-            <Image source={movie.poster_path} style={{...styles.thumb, width: width - 32, height: height / 3}}/>
+            <Image source={{uri: getMoviePosterUrl(movie.poster_path)}} 
+                style={{...styles.thumb, width: width - 32, height: height / 3}}/>
             <Text style={styles.title}>{movie.title}</Text>
-            <Text style={styles.authors}>{movie.authors.join(', ')}.</Text>
+            <Text style={styles.authors}>{
+                movie.cast?.filter(
+                    (member) => member.order <= 5
+                ).map(
+                    member => `${member.name} (as ${member.character})`
+                ).join(', ')
+            }.</Text>
             <Text>{movie.overview}</Text>
             {
-                movie.rating? (<RatingComp />) : null
+                opinion.rating? (<RatingComp />) : null
             }
             {
-                movie.review? (<ReviewComp />) : null
+                opinion.review? (<ReviewComp />) : null
             }
             <View style={{marginBottom: 16}}></View>
-            <Button title={!movie.rating ? "Rate this movie" : "Edit my score"} onPress={() => {setModalVisible(true)}}/>
+            <Button title={!opinion.rating ? "Rate this movie" : "Edit my score"} 
+                onPress={() => {setModalVisible(true)}}/>
 
             <ReviewModal visible={modalVisible} onReviewCompleted={reviewCompleted} />
         </View>
